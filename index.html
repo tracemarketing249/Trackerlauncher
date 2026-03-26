@@ -295,6 +295,27 @@
   }
   .btn-launch:active { transform: translateY(0); }
 
+  .btn-refresh {
+    background: var(--surface);
+    color: #1a7a3a;
+    border-color: rgba(26,122,58,0.25);
+  }
+  .btn-refresh:hover { background: rgba(26,122,58,0.06); border-color: rgba(26,122,58,0.5); }
+
+  .btn-close {
+    background: var(--surface);
+    color: var(--danger);
+    border-color: rgba(224,90,43,0.25);
+  }
+  .btn-close:hover { background: var(--danger-dim); border-color: var(--danger); }
+
+  .divider-line {
+    width: 1px;
+    height: 28px;
+    background: var(--border);
+    margin: 0 4px;
+  }
+
   /* Toast */
   .toast {
     position: fixed;
@@ -355,7 +376,7 @@
 <body>
 <div class="page">
 
-  <header>
+  <<header>
     <div class="logo-area">
       <img src="https://raw.githubusercontent.com/tracemarketing249/Trackerlauncher/main/logo.png" alt="Trace AgTech Logo">
     </div>
@@ -408,6 +429,15 @@
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 3h8l2 2v7H2V3zM4 3V1h6v2M5 8h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
       Save as file
     </button>
+    <div class="divider-line"></div>
+    <button class="btn btn-refresh" onclick="refreshAll()">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7a5 5 0 1 0 1-3M2 4V1M2 4H5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Refresh all
+    </button>
+    <button class="btn btn-close" onclick="closeAll()">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      Close all
+    </button>
     <button class="btn btn-launch" onclick="launchAll()">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
       Launch all
@@ -425,6 +455,7 @@
 
 <script>
   let rows = [];
+  let openedWindows = [];
 
   function loadFromStorage() {
     try {
@@ -498,8 +529,47 @@
     syncInputValues();
     const valid = rows.filter(r => r.url && r.url.trim().startsWith('http'));
     if (!valid.length) { toast('No valid URLs to launch'); return; }
-    valid.forEach(r => window.open(r.url.trim(), '_blank'));
+    openedWindows = [];
+    valid.forEach(r => {
+      const w = window.open(r.url.trim(), '_blank');
+      if (w) openedWindows.push(w);
+    });
     toast('Launching ' + valid.length + ' tab' + (valid.length > 1 ? 's' : '') + '...');
+  }
+
+  function refreshAll() {
+    syncInputValues();
+    const valid = rows.filter(r => r.url && r.url.trim().startsWith('http'));
+    if (!valid.length) { toast('No valid URLs to refresh'); return; }
+    // Try refreshing tracked windows first
+    let refreshed = 0;
+    openedWindows.forEach(w => {
+      try { if (w && !w.closed) { w.location.reload(); refreshed++; } } catch(e) {}
+    });
+    // If no tracked windows, reopen all
+    if (refreshed === 0) {
+      openedWindows = [];
+      valid.forEach(r => {
+        const w = window.open(r.url.trim(), '_blank');
+        if (w) openedWindows.push(w);
+      });
+      toast('Reopening ' + valid.length + ' tab' + (valid.length > 1 ? 's' : '') + '...');
+    } else {
+      toast('Refreshed ' + refreshed + ' tab' + (refreshed > 1 ? 's' : '') + '');
+    }
+  }
+
+  function closeAll() {
+    let closed = 0;
+    openedWindows.forEach(w => {
+      try { if (w && !w.closed) { w.close(); closed++; } } catch(e) {}
+    });
+    openedWindows = [];
+    if (closed > 0) {
+      toast('Closed ' + closed + ' tab' + (closed > 1 ? 's' : ''));
+    } else {
+      toast('No tracked tabs to close — launch first');
+    }
   }
 
   function syncInputValues() {
